@@ -18,6 +18,7 @@ import (
 var (
 	credentialsFile = flag.String("credentials", "credentials.json", "Path to the Google Cloud credentials JSON file")
 	imageFolder     = flag.String("folder", "images", "Path to the folder containing images")
+	personalEmail   = flag.String("email", "email.txt", "Your personal Google account email")
 )
 
 func main() {
@@ -62,7 +63,19 @@ func main() {
 		log.Fatalf("Unable to create form: %v", err)
 	}
 
-	fmt.Printf("Form created with ID: %s\n", createdForm.FormId)
+	formID := createdForm.FormId
+	editURL := fmt.Sprintf("https://docs.google.com/forms/d/%s/edit", formID)
+	fmt.Printf("Form created with ID: %s\n", formID)
+
+	pe, err := ioutil.ReadFile(*personalEmail)
+	if err != nil {
+		log.Fatalf("Unable to read client secret file: %v", err)
+	}
+	// Share the form with your personal Google account
+	err = shareFormWithEmail(ctx, driveService, formID, string(pe))
+	if err != nil {
+		log.Fatalf("Unable to share form: %v", err)
+	}
 
 	// Read images from the specified folder
 	imageFiles, err := ioutil.ReadDir(*imageFolder)
@@ -124,14 +137,16 @@ func main() {
 	}
 
 	// Perform a batch update to add items to the form
-	_, err = formService.Forms.BatchUpdate(createdForm.FormId, &forms.BatchUpdateFormRequest{
+	_, err = formService.Forms.BatchUpdate(formID, &forms.BatchUpdateFormRequest{
 		Requests: requests,
 	}).Context(ctx).Do()
 	if err != nil {
 		log.Fatalf("Unable to update form: %v", err)
 	}
 
-	fmt.Printf("Form created and updated: %s\n", createdForm.ResponderUri)
+	fmt.Printf("Form created and can be edited at: %s\n", editURL)
+	publicURL := createdForm.ResponderUri
+	fmt.Printf("Public form URL: %s\n", publicURL)
 }
 
 func uploadAndMakeImagePublic(ctx context.Context, driveService *drive.Service, imageFile *os.File) (string, error) {
@@ -154,4 +169,17 @@ func uploadAndMakeImagePublic(ctx context.Context, driveService *drive.Service, 
 	// Return the public URL of the image
 	imageURL := fmt.Sprintf("https://drive.google.com/uc?id=%s", file.Id)
 	return imageURL, nil
+}
+
+func shareFormWithEmail(ctx context.Context, driveService *drive.Service, fileId, email string) error {
+	permission := &drive.Permission{
+		Type:         "user",
+		Role:         "writer",
+		EmailAddress: email,
+	}
+	_, err := driveService.Permissions.Create(fileId, permission).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("failed to share form with email: %v", err)
+	}
+	return nil
 }
