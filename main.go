@@ -18,7 +18,7 @@ import (
 var (
 	credentialsFile = flag.String("credentials", "credentials.json", "Path to the Google Cloud credentials JSON file")
 	imageFolder     = flag.String("folder", "images", "Path to the folder containing images")
-	personalEmail   = flag.String("email", "email.txt", "Your personal Google account email")
+	personalEmail   = flag.String("email", "", "Your personal Google account email")
 )
 
 func main() {
@@ -67,12 +67,8 @@ func main() {
 	editURL := fmt.Sprintf("https://docs.google.com/forms/d/%s/edit", formID)
 	fmt.Printf("Form created with ID: %s\n", formID)
 
-	pe, err := ioutil.ReadFile(*personalEmail)
-	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
-	}
 	// Share the form with your personal Google account
-	err = shareFormWithEmail(ctx, driveService, formID, string(pe))
+	err = shareFormWithEmail(ctx, driveService, formID, *personalEmail)
 	if err != nil {
 		log.Fatalf("Unable to share form: %v", err)
 	}
